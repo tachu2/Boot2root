@@ -1,0 +1,72 @@
+# Boot2root - Writeup 1 (初期調査〜Web侵入)
+
+## 1. 探索と列挙 (Discovery & Enumeration)
+
+### IPアドレスの特定
+攻撃対象のネットワーク範囲をスキャンし、ターゲットのIPアドレスを特定した。
+
+```bash
+nmap -sn 100.64.0.0/22
+# ターゲットIP: 100.64.1.32
+```
+
+### ポートスキャン
+対象ホストに対して詳細なポートスキャンを実行した。
+
+```bash
+nmap -A -p- 100.64.1.32
+```
+
+**検出された主なオープンポート:**
+*   21/tcp: FTP (vsftpd)
+*   22/tcp: SSH (OpenSSH 5.9p1)
+*   80/tcp: HTTP (Apache)
+*   143/tcp: IMAP
+*   443/tcp: HTTPS (Apache)
+*   993/tcp: IMAPS
+
+## 2. Webアプリケーション調査
+
+### HTTP (Port 80)
+ブラウザでアクセスすると "Hack me if you can" というタイトルの「Coming Soon」ページが表示されるのみ。
+ディレクトリ探索ツール (`gobuster`) を使用した結果、`/forum` ディレクトリを発見したが、HTTP経由では `403 Forbidden` となりアクセスできなかった。
+
+### HTTPS (Port 443)
+HTTPS経由で以下のURLにアクセス可能であることが判明した。
+*   `https://100.64.1.32/forum/` (My Little Forum 掲示板)
+*   `https://100.64.1.32/phpmyadmin/` (データベース管理)
+
+## 3. 脆弱性の発見と情報漏洩
+
+掲示板 (`/forum`) を調査中、以下のURLにて興味深い投稿を発見した。
+URL: `https://100.64.1.32/forum/index.php?id=6`
+
+**内容:**
+ユーザー `lmezard` による投稿で、サーバーの `/var/log/auth.log` の一部が貼り付けられていた。
+ログを解析したところ、ユーザーがパスワード入力欄ではなくユーザー名入力欄に誤ってパスワードを入力したと思われる記録を発見した。
+
+```text
+Oct  5 08:45:29 BornToSecHackMe sshd[7547]: Failed password for invalid user !q\]Ej?*5K5cy*AJ from 161.202.39.38 port 57764 ssh2
+```
+
+**特定された認証情報:**
+*   **パスワード:** `!q\]Ej?*5K5cy*AJ`
+*   **関連ユーザー:** `lmezard` (投稿者)
+
+## 4. Webサービスへの侵入
+
+### 掲示板へのログイン
+入手した情報を使用し、掲示板へのログインに成功した。
+*   ユーザー: `lmezard`
+*   パスワード: `!q\]Ej?*5K5cy*AJ`
+
+ログイン後、プロフィールページから以下のメールアドレスを入手した。
+*   Email: `laurie@borntosec.net`
+
+### phpMyAdminへのログイン
+同じ認証情報を使用し、`https://100.64.1.32/phpmyadmin/` へのログインに成功した。
+これにより、サーバー上のデータベース (`forum` など) を閲覧・操作する権限を得た。
+
+---
+**次のステップ:**
+phpMyAdminを利用して、他のユーザー（`admin` や `zaz`）のパスワードハッシュを抽出し、システム（SSH）へのログインを目指す。
