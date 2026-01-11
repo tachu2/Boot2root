@@ -35,6 +35,7 @@ nmap -A -p- 100.64.1.32
 HTTPS経由で以下のURLにアクセス可能であることが判明した。
 *   `https://100.64.1.32/forum/` (My Little Forum 掲示板)
 *   `https://100.64.1.32/phpmyadmin/` (データベース管理)
+*   `https://100.64.1.32/webmail/` (SquirrelMail Webメール)
 
 ## 3. 脆弱性の発見と情報漏洩
 
@@ -57,16 +58,29 @@ Oct  5 08:45:29 BornToSecHackMe sshd[7547]: Failed password for invalid user !q\
 
 ### 掲示板へのログイン
 入手した情報を使用し、掲示板へのログインに成功した。
-*   ユーザー: `lmezard`
-*   パスワード: `!q\]Ej?*5K5cy*AJ`
+*   **ユーザー:** `lmezard`
+*   **パスワード:** `!q\]Ej?*5K5cy*AJ`
 
-ログイン後、プロフィールページから以下のメールアドレスを入手した。
-*   Email: `laurie@borntosec.net`
+ログイン後、`lmezard` のプロフィールページを確認し、以下のメールアドレスを入手した。
+*   **Email:** `laurie@borntosec.net`
 
-### phpMyAdminへのログイン
-同じ認証情報を使用し、`https://100.64.1.32/phpmyadmin/` へのログインに成功した。
-これにより、サーバー上のデータベース (`forum` など) を閲覧・操作する権限を得た。
+### WebメールへのログインとDB情報の奪取
+入手したメールアドレス `laurie@borntosec.net` と上記のパスワードを使用して、`https://100.64.1.32/webmail/` (SquirrelMail) へのログインに成功した。
+
+受信トレイを確認したところ、データベースへのアクセス情報が記載されたメールを発見した。
+
+**メール内容:**
+> Subject: DB Access
+> From: qudevide@mail.borntosec.net
+>
+> Hey Laurie,
+>
+> You cant connect to the databases now. Use root/Fg-'kKXBj87E:aJ$
+
+これにより、データベース管理用の特権アカウントを入手した。
+*   **DB User:** `root`
+*   **DB Password:** `Fg-'kKXBj87E:aJ$`
 
 ---
 **次のステップ:**
-phpMyAdminを利用して、他のユーザー（`admin` や `zaz`）のパスワードハッシュを抽出し、システム（SSH）へのログインを目指す。
+入手した `root` アカウントで phpMyAdmin にログインし、他のユーザー（`admin` や `zaz`）のパスワードハッシュを抽出し、システム（SSH）へのログインを目指す。
