@@ -27,18 +27,25 @@ nmap -A -p- 100.64.1.32
 
 ## 2. Webアプリケーション調査
 
-### HTTP (Port 80)
-ブラウザでアクセスすると "Hack me if you can" というタイトルの「Coming Soon」ページが表示されるのみ。
-ディレクトリ探索ツール (`gobuster`) を使用し、隠しディレクトリを調査した。
+### HTTP (Port 80) / HTTPS (Port 443)
+ブラウザでアクセスすると "Hack me if you can" というタイトルの「Coming Soon」ページが表示されるのみであった。
+そこで、ディレクトリ探索ツール (`gobuster`) と辞書ファイル (`scripts/common.txt`) を使用し、隠しディレクトリや管理ページを調査した。
+
+※ `scripts/common.txt` は、ディレクトリ探索ツール `dirb` の標準辞書（`common.txt`）を使用。
+(ソース: `https://github.com/v0re/dirb/blob/master/wordlists/common.txt`)
 
 ```bash
-gobuster dir -u http://100.64.1.32/ -w scripts/common.txt
+gobuster dir -u https://100.64.1.32/ -w scripts/common.txt -k
 ```
 
-その結果、`/forum` ディレクトリを発見したが、HTTP経由では `403 Forbidden` となりアクセスできなかった。
+**スキャン結果:**
+以下の重要なディレクトリが発見された。
+*   `/forum` (HTTPでは 403 Forbidden, HTTPSでアクセス可能)
+*   `/phpmyadmin` (データベース管理インターフェース)
+*   `/webmail` (Webメールログイン画面)
 
-### HTTPS (Port 443)
-HTTPS経由で以下のURLにアクセス可能であることが判明した。
+### HTTPS (Port 443) の確認
+発見されたディレクトリに HTTPS 経由でアクセスし、それぞれの稼働を確認した。
 *   `https://100.64.1.32/forum/` (My Little Forum 掲示板)
 *   `https://100.64.1.32/phpmyadmin/` (データベース管理)
 *   `https://100.64.1.32/webmail/` (SquirrelMail Webメール)
