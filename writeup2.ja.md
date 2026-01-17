@@ -19,17 +19,22 @@ lmezard:G!@M6f4Eatau{sF"
 `README` には「このチャレンジをクリアして結果を `laurie` の SSH パスワードとして使用せよ」との指示があった。
 
 1.  **ファイルの展開:** `tar -xf fun` により `ft_fun/` ディレクトリが生成された。
-2.  **コードの復元:** ディレクトリ内には大量の `.pcap` ファイルがあり、それぞれに C 言語の断片と順序を示すコメント (`//fileXXX`) が含まれていた。
-3.  **スクリプトによる結合:** 番号順にファイルを結合し、`main.c` を復元した。
+2.  **構造の解析:** ディレクトリ内には大量の `.pcap` ファイルがあり、各ファイルに C 言語の断片と `//fileXXX` という形式の順序を示すコメントが含まれていた。
+3.  **コマンドによる自動復元:** 以下のパイプラインを実行し、番号順にファイルを抽出・結合してソースコードを復元した。
     ```bash
+    # 順序マーカーを抽出 -> 番号順にソート -> ファイル名のみ抽出 -> 結合
     grep -r "//file" ft_fun | sed 's/\(.*\):\/\/file\([0-9]*\)/\2 \1/' | sort -n | awk '{print $2}' | xargs cat > reconstructed.c
+    
+    # ソースコード内のマーカーを削除
+    sed -i 's/\/\/file[0-9]*//g' reconstructed.c
     ```
-4.  **パスワードの特定:** 復元したコードを実行したところ、以下の出力が得られた。
-    ```text
-    MY PASSWORD IS: Iheartpwnage
-    Now SHA-256 it and submit
+4.  **パスワードの特定:** 復元したコードをコンパイル・実行した。
+    ```bash
+    gcc reconstructed.c -o solution && ./solution
+    # 出力: MY PASSWORD IS: Iheartpwnage
+    #      Now SHA-256 it and submit
     ```
-5.  **ハッシュ化:** `Iheartpwnage` を SHA-256 でハッシュ化した。
+5.  **ハッシュ化:** `Iheartpwnage` を指示通り SHA-256 でハッシュ化した。
     ```bash
     echo -n "Iheartpwnage" | sha256sum
     # 330b845f32185747e4f8ca15d40ca59796035c89ea809fb5d30f4da83ecf45a4
