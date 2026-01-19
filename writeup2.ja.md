@@ -206,17 +206,29 @@ lmezard:G!@M6f4Eatau{sF"
 
 ### turtle チャレンジ
 `thor` のホームディレクトリに `turtle` というファイルと、指示が書かれた `README` があった。
-`turtle` ファイルにはフランス語によるタートルグラフィックスの命令（Avance, Tourne gauche 等）が大量に記述されていた。
+`turtle` ファイルには、フランス語によるタートルグラフィックス（亀を動かして図形を描くプログラム）の命令が大量（約33KB）に記述されていた。
 
-1.  **描画の解析:** 命令に従って図形を描画すると、文字が浮かび上がる。
-2.  **キーワードの特定:** 全ての命令を解析した結果、描画される単語は **`SLASH`** であった。
-3.  **パスワードの生成:** `README` の "Can you digest the message?" というヒントから、`SLASH` の MD5 ハッシュを計算した。
+1.  **命令の解析:**
+    ファイル内の主要な命令は以下の通り。
+    - `Avance X spaces`: X歩進む
+    - `Recule X spaces`: X歩下がる
+    - `Tourne gauche de X degrees`: 左にX度回転
+    - `Tourne droite de X degrees`: 右にX度回転
+
+2.  **描画スクリプトの作成:**
+    これらの命令をパースし、座標計算を行って図形を可視化する Python スクリプト（`draw_turtle_svg.py`）を作成した。座標系を管理し、一筆書きの経路を SVG ファイルとして出力する。
+
+3.  **キーワードの特定:**
+    生成された `turtle_result.svg` を確認したところ、一筆書きで **`SLASH`** という文字が描画されていた。
+
+4.  **パスワードの生成:**
+    `README` の "Can you digest the message?" というヒント（digest = ハッシュ値の意）に従い、`SLASH` の MD5 ハッシュを計算した。
     ```bash
     echo -n "SLASH" | md5sum
     # 646da671ca01bb5d84dbb5fb2238dc8e
     ```
 
-このハッシュ値をパスワードとして、`zaz` ユーザーでのログインに成功した。
+このハッシュ値 `646da671ca01bb5d84dbb5fb2238dc8e` をパスワードとして使用し、`zaz` ユーザーでのログインに成功した。
 
 ## 5. Root 権限の奪取（exploit_me）
 
